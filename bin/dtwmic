@@ -1,0 +1,160 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use utf8;
+
+# 'v0.0.1'
+
+use List::Util qw(max);
+use Getopt::Long;
+
+use Data::Dumper;
+
+use Udev::FFI;
+#use Log::Any qw($log);
+
+
+
+my $help;
+my $list;
+my $config_path;
+my $has_gui;
+
+GetOptions(
+    'h|help' => \$help,
+    'l|list' => \$list,
+    'c|config=s' => \$config_path,
+    't|tray-icon' => \$has_gui
+)
+or die("Error in command line arguments\n");
+
+
+my $udev = Udev::FFI->new() or
+    die("Can't initialize Udev::FFI library: $@");
+
+my $enumerate = $udev->new_enumerate() or
+    die("Can't create enumerate context: $@");
+
+if (!$enumerate->add_match_subsystem('input')) {
+    warn "Ouch!";
+}
+
+
+if (defined($list)) {
+    if (!$enumerate->scan_devices()) {
+        warn "O2";
+    }
+
+    my @devices = $enumerate->get_list_entries();
+
+    my $mouse_devices = {};
+    my $touchpads = {};
+    my $tablets = {};
+
+    for(@devices) {
+        if (defined(my $device = $udev->new_device_from_syspath($_))) {
+            my $id_input_mouse          = $device->get_property_value('ID_INPUT_MOUSE');
+            my $id_input_touchpad       = $device->get_property_value('ID_INPUT_TOUCHPAD');
+            my $id_input_tablet         = $device->get_property_value('ID_INPUT_TABLET');
+            my $id_input_touchscreen    = $device->get_property_value('ID_INPUT_TOUCHSCREEN');
+
+            if (defined($id_input_mouse) && $id_input_mouse eq '1') {
+                # ID_INPUT_MOUSE: Touchscreens and tablets have this flag as
+                # well, since by the type of events they can produce they act as
+                # a mouse.
+                # https://askubuntu.com/questions/520359/how-to-detect-touchscreen-devices-from-a-script
+
+
+                if (defined($id_input_touchpad) && $id_input_touchpad eq '1') {
+                    #push @$touchpads
+                    next;
+                }
+                elsif (defined($id_input_tablet) && $id_input_tablet eq '1') {
+                    #push @$tablets
+                    next;
+                }
+                elsif (defined($id_input_touchscreen) && $id_input_touchscreen eq '1') {
+                    next;
+                }
+
+                #push @$mouse_devices
+            }
+            elsif (defined($id_input_touchpad) && $id_input_touchpad eq '1') {
+                my $parent = $device->get_parent_with_subsystem_devtype('input');
+
+                next
+                    unless defined $parent;
+
+                my $name = $parent->get_property_value('NAME');
+                $name = 'unknown'
+                    unless defined $name;
+
+                $touchpads->{ $device->get_property_value('MAJOR') } = {
+                    name        => $name,
+                    name_length => length($name)
+                };
+
+                #warn Dumper( my $h = $device->get_properties_list_entries() );
+            }
+            elsif (defined($id_input_tablet) && $id_input_tablet eq '1') {
+                #push @$tablets
+            }
+        }
+    }
+
+
+    my $max_str_length = max(
+        map { $touchpads->{$_}{name_length} } keys(%$touchpads)
+    ) + 8;
+    $max_str_length -= ($max_str_length % 4);
+
+    print "MOUSE DEVICES:\n";
+    for (sort {$a <=> $b} keys(%$mouse_devices)) {
+        print '  '.$mouse_devices->{$_}{name}.(' ' x ($max_str_length - $mouse_devices->{$_}{name_length})).'major='.$_."\n";
+    }
+
+    print "TOUCHPAD DEVICES:\n";
+    for (sort {$a <=> $b} keys(%$touchpads)) {
+        print '  '.$touchpads->{$_}{name}.(' ' x ($max_str_length - $touchpads->{$_}{name_length})).'major='.$_."\n";
+    }
+
+
+    exit(0);
+}
+
+
+my $monitor = $udev->new_monitor() or
+    die "Can't create udev monitor: $@";
+
+if (!$monitor->filter_by_subsystem_devtype('input')) {
+    warn "Ouch!";
+}
+
+
+if(!$monitor->start()) {
+    die "Ouch!";
+}
+
+
+
+$enumerate->scan_devices();
+
+my @devices = $enumerate->get_list_entries();
+
+for(@devices) {
+    if (defined(my $device = $udev->new_device_from_syspath($_))) {
+        #my $device = $monitor->poll(); #blocking read
+        #my $action = $device->get_action();
+
+
+        #warn Dumper $device->get_sysattr_list_entries();
+        warn Dumper $device->get_properties_list_entries();
+        if ($device->get_property_value('ID_INPUT_MOUSE')) {
+            print 'SYSNAME: '.$device->get_sysname(), "\n";
+            print 'DEVNODE: '.$device->get_devnode(), "\n";
+            print "----------------------------\n";
+        }
+    }
+}
