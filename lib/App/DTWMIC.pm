@@ -2,9 +2,12 @@ package App::DTWMIC;
 
 use strict;
 use 5.008_005;
-our $VERSION = '0.01';
+our $VERSION = '0.001';
 
 1;
+
+
+
 __END__
 
 =encoding utf-8
