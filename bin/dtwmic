@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+# App::DTWMIC - Copyright (C) 2019 Ilya Pavlov
 
 use strict;
 use warnings;
@@ -10,8 +11,7 @@ use App::DTWMIC;
 use List::Util qw(max);
 use Getopt::Long;
 
-use Data::Dumper;
-
+use YAML::Tiny;
 use Udev::FFI;
 #use Gtk3 '-init';
 
@@ -68,18 +68,59 @@ sub _get_device_type {
 
 
 
-my $help;
-my $list;
-my $config_path;
-#my $has_gui;
+sub _get_device_data {
+    my $device = shift;
 
-GetOptions(
-    'h|help' => \$help,
-    'l|list' => \$list,
-    'f|config-file=s' => \$config_path,
-#    'c|configure' => \$has_gui
-)
-or die("Error in command line arguments\n");
+    my $parent = $device->get_parent_with_subsystem_devtype('input');
+
+    return {}
+        unless defined $parent;
+
+    my $device_type = _get_device_type($device);
+
+    my $name = $parent->get_property_value('NAME');
+    $name = 'unknown'
+        unless defined $name;
+
+    return {
+        type    => $device_type,
+        sysname => $parent->get_sysname(),
+        data    => {
+            name    => $name
+        }
+    };
+}
+
+
+
+my $config_path;
+my $list;
+
+{
+    my $help;
+    my $version;
+    #my $configure;
+
+    GetOptions(
+        'h|help' => \$help,
+        'v|version' => \$version,
+        'l|list' => \$list,
+        'f|config-file=s' => \$config_path,
+    #    'c|configure' => \$configure
+    )
+    or do { $help = 1 };
+
+    if (defined($help)) {
+        require Pod::Usage;
+        Pod::Usage->import();
+        pod2usage(1);
+    }
+
+    if (defined($version)) {
+        print "dtwmic version is $App::DTWMIC::VERSION\n";
+        exit(0);
+    }
+}
 
 
 my $udev = Udev::FFI->new() or
@@ -92,6 +133,10 @@ $enumerate->add_match_subsystem('input') or
     die("Can't add match subsystem: $!");
 
 
+my $mouse_devices = {};
+my $touchpads = {};
+my $tablets = {};
+
 if (defined($list)) {
     $enumerate->scan_devices() or
         die("Can't scan devices: $!");
@@ -99,43 +144,31 @@ if (defined($list)) {
     my $devices = $enumerate->get_list_entries() or
         die "Can't get devices: $!";
 
-    my $mouse_devices = {};
-    my $touchpads = {};
-    my $tablets = {};
     my @lengths;
 
     for (keys(%$devices)) {
         if (defined(my $device = $udev->new_device_from_syspath($_))) {
-            my $parent = $device->get_parent_with_subsystem_devtype('input');
-
+            my $device_data = _get_device_data($device);
             next
-                unless defined $parent;
-
-            my $device_type = _get_device_type($device);
-            my $name = $parent->get_property_value('NAME');
-            $name = 'unknown'
-                unless defined $name;
+                unless %$device_data;
 
             my $p_devices;
-            if (DEVICE_INPUT_MOUSE == $device_type) {
+            if (DEVICE_INPUT_MOUSE == $device_data->{type}) {
                 $p_devices = $mouse_devices;
             }
-            elsif (DEVICE_INPUT_TOUCHPAD == $device_type) {
+            elsif (DEVICE_INPUT_TOUCHPAD == $device_data->{type}) {
                 $p_devices = $touchpads;
             }
-            elsif (DEVICE_INPUT_TABLET == $device_type) {
+            elsif (DEVICE_INPUT_TABLET == $device_data->{type}) {
                 $p_devices = $tablets;
             }
             else {
                 next;
             }
 
+            $p_devices->{ $device_data->{sysname} } = $device_data->{data};
 
-            $p_devices->{ $parent->get_sysname() } = {
-                name => $name
-            };
-
-            push(@lengths, length($name));
+            push(@lengths, length( $device_data->{data}{name} ));
         }
     }
 
@@ -158,6 +191,16 @@ if (defined($list)) {
 }
 
 
+if (!defined($config_path)) {
+    require File::HomeDir;
+
+    my $config_dir = File::HomeDir->my_home.'/.config/dtwmic/';
+    if (!-d $config_dir) {
+
+    }
+}
+
+
 my $monitor = $udev->new_monitor() or
     die "Can't create udev monitor: $@";
 
@@ -174,18 +217,104 @@ $enumerate->scan_devices() or
 my $devices = $enumerate->get_list_entries() or
     die "Can't get devices: $!";
 
-for(keys(%$devices)) {
+
+for (keys(%$devices)) {
     if (defined(my $device = $udev->new_device_from_syspath($_))) {
-        #my $device = $monitor->poll(); #blocking read
-        #my $action = $device->get_action();
+        my $device_data = _get_device_data($device);
+        next
+            unless %$device_data;
 
-
-        #warn Dumper $device->get_sysattr_list_entries();
-        warn Dumper $device->get_properties_list_entries();
-        if ($device->get_property_value('ID_INPUT_MOUSE')) {
-            print 'SYSNAME: '.$device->get_sysname(), "\n";
-            print 'DEVNODE: '.$device->get_devnode(), "\n";
-            print "----------------------------\n";
+        my $p_devices;
+        if (DEVICE_INPUT_MOUSE == $device_data->{type}) {
+            $p_devices = $mouse_devices;
         }
+        elsif (DEVICE_INPUT_TOUCHPAD == $device_data->{type}) {
+            $p_devices = $touchpads;
+        }
+        elsif (DEVICE_INPUT_TABLET == $device_data->{type}) {
+            $p_devices = $tablets;
+        }
+        else {
+            next;
+        }
+
+        $p_devices->{ $device_data->{sysname} } = $device_data->{data};
     }
 }
+
+
+if (%$mouse_devices) {
+    for (keys(%$touchpads)) {
+
+    }
+}
+
+
+for (;;) {
+    my $device = $monitor->poll();
+    my $action = $device->get_action();
+
+    my $device_data = _get_device_data($device);
+    next
+        unless %$device_data;
+
+    my $has_mouse_devices_old;
+
+    my $p_devices;
+    if (DEVICE_INPUT_MOUSE == $device_data->{type}) {
+        $p_devices = $mouse_devices;
+    }
+    elsif (DEVICE_INPUT_TOUCHPAD == $device_data->{type}) {
+        $p_devices = $touchpads;
+    }
+    elsif (DEVICE_INPUT_TABLET == $device_data->{type}) {
+        $p_devices = $tablets;
+    }
+    else {
+        next;
+    }
+
+
+    if ($action eq 'add') {
+        $p_devices->{ $device_data->{sysname} } = $device_data->{data};
+    }
+    elsif ($action eq 'remove') {
+        warn $device_data->{sysname};
+        delete $p_devices->{ $device_data->{sysname} };
+    }
+}
+
+
+
+__END__
+
+=encoding utf-8
+
+=head1 NAME
+
+App::DTWMIC - Blah blah blah
+
+=head1 SYNOPSIS
+
+  use App::DTWMIC;
+
+=head1 DESCRIPTION
+
+App::DTWMIC is
+
+=head1 AUTHOR
+
+Ilya Pavlov E<lt>ilux@cpan.orgE<gt>
+
+=head1 COPYRIGHT
+
+Copyright 2019- Ilya Pavlov
+
+=head1 LICENSE
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=head1 SEE ALSO
+
+=cut
