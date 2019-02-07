@@ -1,5 +1,7 @@
 #!/usr/bin/perl
 # App::DTWMIC - Copyright (C) 2019 Ilya Pavlov
+# App::DTWMIC is licensed under the
+# GNU Lesser General Public License v2.1
 
 use strict;
 use warnings;
@@ -196,8 +198,36 @@ if (!defined($config_path)) {
 
     my $config_dir = File::HomeDir->my_home.'/.config/dtwmic/';
     if (!-d $config_dir) {
+        require File::Path;
+        File::Path->import('make_path');
 
+        make_path($config_dir, {error => \my $err});
+        die("Can't create directory '$config_dir': ".$err->[0]."\n")
+            if (@$err);
     }
+
+    $config_path = $config_dir.'config.yml';
+
+    if (!-f $config_path) {
+        #
+        my $fh;
+        open($fh, '>', $config_path) or
+            die("Can't create default config file $config_path: $!\n");
+
+        print $fh qq{touchpadon: /usr/bin/synclient touchpadoff=0
+touchpadoff: /usr/bin/synclient touchpadoff=1
+};
+        close($fh);
+    }
+}
+
+
+my $config;
+eval {
+    $config = YAML::Tiny->read($config_path)->[0];
+};
+if ($@) {
+    die("Can't load config file $config_path: $@\n");
 }
 
 
@@ -311,9 +341,6 @@ Ilya Pavlov E<lt>ilux@cpan.orgE<gt>
 Copyright 2019- Ilya Pavlov
 
 =head1 LICENSE
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
 
 =head1 SEE ALSO
 
