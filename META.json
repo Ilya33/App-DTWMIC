@@ -73,5 +73,5 @@
       "Ilya Pavlov <iluxz@mail.ru>"
    ],
    "x_serialization_backend" : "JSON::PP version 2.27400",
-   "x_static_install" : 1
+   "x_static_install" : 0
 }
