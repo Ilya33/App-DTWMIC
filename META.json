@@ -28,7 +28,7 @@
    "prereqs" : {
       "configure" : {
          "requires" : {
-            "Module::Build::Tiny" : "0.035"
+            "Module::Build" : "0.4005"
          }
       },
       "develop" : {
@@ -68,6 +68,7 @@
       }
    },
    "version" : "0.001",
+   "x_authority" : "cpan:ILUX",
    "x_contributors" : [
       "Ilya Pavlov <iluxz@mail.ru>"
    ],
