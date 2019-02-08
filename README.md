@@ -1,14 +1,12 @@
 # NAME
 
-App::DTWMIC - Blah blah blah
+dtwmic - disable touchpad when mouse is connected
 
 # SYNOPSIS
 
-    use App::DTWMIC;
-
 # DESCRIPTION
 
-App::DTWMIC is
+add dtwmic to your X window manager autostart;
 
 # AUTHOR
 
@@ -20,7 +18,6 @@ Copyright 2019- Ilya Pavlov
 
 # LICENSE
 
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
+GNU Lesser General Public License v2.1
 
 # SEE ALSO

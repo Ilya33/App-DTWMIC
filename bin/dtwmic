@@ -31,6 +31,9 @@ use constant {
 };
 
 
+my $config;
+
+
 
 sub _get_device_type {
     my $device = shift;
@@ -95,6 +98,21 @@ sub _get_device_data {
             name    => $name
         }
     };
+}
+
+
+
+sub _enable_touchpads($$) {
+    my $toushpads = shift;
+    my $is_enable = shift;
+
+    for (keys(%$toushpads)) {
+        my $cmd = $is_enable ?$config->{touchpadon} :$config->{touchpadoff};
+        my $tname = $toushpads->{$_}{name};
+        $cmd =~ s/(?<=[^\\])\$TOUCHPAD_NAME(?=[^a-zA-Z_\d])/$tname/;
+
+        system($cmd);
+    }
 }
 
 
@@ -231,13 +249,15 @@ if (!defined($config_path)) {
             die("Can't create default config file $config_path: $!\n");
 
         if (defined($synclient_path)) {
-            print $fh qq{touchpadon: $synclient_path touchpadoff=0
+            print $fh qq{# \$TOUCHPAD_NAME variable available here
+touchpadon: $synclient_path touchpadoff=0
 touchpadoff: $synclient_path touchpadoff=1
 };
         }
         else {
-            print $fh qq{touchpadon: xinput set-prop "Touchpad" "Device Enabled" 1
-touchpadoff: xinput set-prop "Touchpad" "Device Enabled" 0
+            print $fh qq{# \$TOUCHPAD_NAME variable available here
+touchpadon: xinput set-prop \$TOUCHPAD_NAME "Device Enabled" 1
+touchpadoff: xinput set-prop \$TOUCHPAD_NAME "Device Enabled" 0
 };
         }
 
@@ -246,7 +266,6 @@ touchpadoff: xinput set-prop "Touchpad" "Device Enabled" 0
 }
 
 
-my $config;
 eval {
     $config = YAML::Tiny->read($config_path)->[0];
 };
@@ -298,10 +317,10 @@ for (keys(%$devices)) {
 
 
 if (%$mouse_devices) {
-    system( $config->{touchpadoff} );
+    _enable_touchpads($touchpads, 0);
 }
 else {
-    system( $config->{touchpadon} );
+    _enable_touchpads($touchpads, 1);
 }
 
 
@@ -336,7 +355,7 @@ for (;;) {
         $p_devices->{ $device_data->{sysname} } = $device_data->{data};
 
         if (0 == $has_mouse_devices && %$mouse_devices) {
-            system( $config->{touchpadoff} );
+            _enable_touchpads($touchpads, 0);
             $has_mouse_devices = 1;
         }
     }
@@ -344,7 +363,7 @@ for (;;) {
         delete $p_devices->{ $device_data->{sysname} };
 
         if (0 != $has_mouse_devices && !%$mouse_devices) {
-            system( $config->{touchpadon} );
+            _enable_touchpads($touchpads, 1);
             $has_mouse_devices = 0;
         }
     }
