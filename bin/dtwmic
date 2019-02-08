@@ -8,10 +8,10 @@ use warnings;
 
 use utf8;
 
-use App::DTWMIC;
-
 use List::Util qw(max);
 use Getopt::Long;
+
+use App::DTWMIC;
 
 use YAML::Tiny;
 use Udev::FFI;
@@ -23,7 +23,11 @@ use constant {
     DEVICE_INPUT_MOUSE          => 1,
     DEVICE_INPUT_TOUCHPAD       => 2,
     DEVICE_INPUT_TABLET         => 3,
-    DEVICE_INPUT_TOUCHSCREEN    => 4
+    DEVICE_INPUT_TOUCHSCREEN    => 4,
+
+    SYNCLIENT_LOCATIONS => [
+        '/usr/bin/synclient'
+    ]
 };
 
 
@@ -209,14 +213,34 @@ if (!defined($config_path)) {
     $config_path = $config_dir.'config.yml';
 
     if (!-f $config_path) {
-        #
+        require File::Which;
+        File::Which->import();
+
+        my $synclient_path = which('synclient');
+        if(!defined($synclient_path)) {
+            for(@{ +SYNCLIENT_LOCATIONS }) {
+                if(-f) {
+                    $synclient_path = $_;
+                    last;
+                }
+            }
+        }
+
         my $fh;
         open($fh, '>', $config_path) or
             die("Can't create default config file $config_path: $!\n");
 
-        print $fh qq{touchpadon: /usr/bin/synclient touchpadoff=0
-touchpadoff: /usr/bin/synclient touchpadoff=1
+        if (defined($synclient_path)) {
+            print $fh qq{touchpadon: $synclient_path touchpadoff=0
+touchpadoff: $synclient_path touchpadoff=1
 };
+        }
+        else {
+            print $fh qq{touchpadon: xinput set-prop "Touchpad" "Device Enabled" 1
+touchpadoff: xinput set-prop "Touchpad" "Device Enabled" 0
+};
+        }
+
         close($fh);
     }
 }
@@ -274,11 +298,14 @@ for (keys(%$devices)) {
 
 
 if (%$mouse_devices) {
-    for (keys(%$touchpads)) {
-
-    }
+    system( $config->{touchpadoff} );
+}
+else {
+    system( $config->{touchpadon} );
 }
 
+
+my $has_mouse_devices = %$mouse_devices ?1 :0;
 
 for (;;) {
     my $device = $monitor->poll();
@@ -307,10 +334,19 @@ for (;;) {
 
     if ($action eq 'add') {
         $p_devices->{ $device_data->{sysname} } = $device_data->{data};
+
+        if (0 == $has_mouse_devices && %$mouse_devices) {
+            system( $config->{touchpadoff} );
+            $has_mouse_devices = 1;
+        }
     }
     elsif ($action eq 'remove') {
-        warn $device_data->{sysname};
         delete $p_devices->{ $device_data->{sysname} };
+
+        if (0 != $has_mouse_devices && !%$mouse_devices) {
+            system( $config->{touchpadon} );
+            $has_mouse_devices = 0;
+        }
     }
 }
 
