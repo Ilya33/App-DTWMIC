@@ -135,9 +135,17 @@ my $list;
     or do { $help = 1 };
 
     if (defined($help)) {
-        require Pod::Usage;
-        Pod::Usage->import();
-        pod2usage(1);
+        print q{Usage:
+    dtwmic [OPTIONS]
+    dtwmic f|config-file=CUSTOM_CONFIG_FILE_PATH
+
+    h | help    - show help
+    v | version - show dtwmic version
+    l | list    - list mouse/touchpad devices
+
+    a default config file is created on the first run in ~/.config/dtwmic/config.yml (if not exists)
+};
+        exit(0);
     }
 
     if (defined($version)) {
@@ -377,15 +385,28 @@ __END__
 
 =head1 NAME
 
-App::DTWMIC - Blah blah blah
+dtwmic - disable touchpad when mouse is connected
 
 =head1 SYNOPSIS
 
-  use App::DTWMIC;
+    dtwmic [OPTIONS]
+    dtwmic f | config-file=CUSTOM_CONFIG_FILE_PATH
+    
+    h | help    - show help
+    v | version - show dtwmic version
+    l | list    - list mouse/touchpad devices
 
 =head1 DESCRIPTION
 
-App::DTWMIC is
+1) add dtwmic to your X window manager autostart
+2) enjoy
+
+A default configuration file is created on the first run in ~/.config/dtwmic/config.yml (if not exists)
+
+=head1 BUGS
+
+Please report any bugs through the web interface at
+L<https://github.com/Ilya33/App-DTWMIC/issues>. Patches are always welcome.
 
 =head1 AUTHOR
 
@@ -397,6 +418,6 @@ Copyright 2019- Ilya Pavlov
 
 =head1 LICENSE
 
-=head1 SEE ALSO
+GNU Lesser General Public License v2.1
 
 =cut
