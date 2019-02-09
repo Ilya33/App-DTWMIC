@@ -67,7 +67,7 @@
          "web" : "https://github.com/Ilya33/App-DTWMIC"
       }
    },
-   "version" : "0.001",
+   "version" : "0.002",
    "x_authority" : "cpan:ILUX",
    "x_contributors" : [
       "Ilya Pavlov <iluxz@mail.ru>"

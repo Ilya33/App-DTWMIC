@@ -8,7 +8,7 @@ use utf8;
 
 use 5.008_005;
 
-our $VERSION = '0.001';
+our $VERSION = '0.002';
 
 
 
@@ -24,6 +24,13 @@ __END__
 
 dtwmic - disable touchpad when a mouse is connected
 
+=head1 INSTALL
+
+    curl -L https://cpanmin.us | perl - App::DTWMIC
+
+Note: you may wish to install a package like libffi-platypus-perl on your distro
+to fast installation
+
 =head1 SYNOPSIS
 
     dtwmic [OPTIONS]
@@ -35,10 +42,12 @@ dtwmic - disable touchpad when a mouse is connected
 
 =head1 DESCRIPTION
 
-1) add dtwmic to your X window manager autostart
-2) enjoy
+Add dtwmic to your X window manager autostart.
 
-A default configuration file is created on the first run in ~/.config/dtwmic/config.yml (if not exists)
+A default configuration file is created on the first run in
+~/.config/dtwmic/config.yml (if not exists).
+
+You need synclient or xinput by default otherwise edit the config.
 
 =head1 BUGS
 
